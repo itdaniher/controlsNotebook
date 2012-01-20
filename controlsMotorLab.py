@@ -6,35 +6,43 @@ from pylab import *
 import numpy
 
 cee = connectClient.CEE()
+# set a sample rate of 40,000 samples per second
 cee.setSampleRate(40)
+# for four quadrant operation, use a "zero" point of 2v5
 zero = 2.5
-_unTwos = lambda x, bitlen: x-(1<<bitlen) if (x&(1<<(bitlen-1))) else x
-_chunk = lambda l, x: [l[i:i+x] for i in xrange(0, len(l), x)] 
-_flatten = lambda l: list(itertools.chain(*[[x] if type(x) not in [list] else x for x in l]))
 
 def getCounters():
+	# get four bytes from xmega onboard cee
 	data = cee.dev.ctrl_transfer(0x80 | 0x40, 0x10, 0, 0, 4)
-	ticks = data[1] << 8 | data[0]
-	samples = data[3] << 8 | data[2]
-	return ticks, samples
+	# ticks are time increments of units samples
+	sampleCounter = data[1] << 8 | data[0]
+	position = data[3] << 8 | data[2]
+	return sampleCounter, position
 
 def getRPS(dt = .1):
+	# catch overflow of 16b timer/counters by comparing two subsequent values
 	def catchOverflow(a_v, b_v):
 		if (a_v > (2**16)*(3/4)) and (b_v < (2**16)*(1/4)):
 			b_v += 2**16
 		return a_v, b_v
+	# getCounters
 	a_t, a_s = getCounters()
-	a_ss = cee.setOutputConstant('a', 'v', zero)['startSample']
+	# wait
 	time.sleep(dt)
+	# getCounters
 	b_t, b_s = getCounters()
+	# clean
 	a_t, b_t = catchOverflow(a_t, b_t)
 	a_s, b_s = catchOverflow(a_s, b_s)
 	try:
 		assert b_s > a_s
 	except:
 		return getRPS(dt)
+	# normalize position data
 	rotations = (b_t-a_t)/1088
+	# normalize time data
 	duration = (b_s-a_s)*cee.devInfo['sampleTime']
+	# rps = rotations / duration
 	rps = rotations / duration
 	return rps
 
@@ -63,12 +71,17 @@ def plotTwoAxes(x, y1, y2, xlabel="x", y1label="y1", y2label="y2"):
 	return f
 
 def DCAnalysis():
+	# ensure "zero" point is where we want it to be
 	cee.setOutputConstant('a', 'v', zero)
+	# set reasonable timestep for steady state analysis
 	dt = 0.2
+	# set to max negative in light of future sampling
 	cee.setOutputConstant('b', 'v', 0)
 	data = []
+	# go through len 50 list of voltages, get voltage, current, and rotational velocity for each voltage
 	for v in linspace(-zero, zero, 50):
 		data.append(getDCSample(v, dt))
+	# cleanup
 	v = [d['v'] for d in data]
 	i = [d['i'] for d in data]
 	dw = [d['dw'] for d in data]
@@ -104,25 +117,43 @@ def DCAnalysis():
 	return data
 
 def ACAnalysis():
+	# make sure zero is actually zero
 	cee.setOutputConstant('a', 'v', zero)
-	tau4 = .5
+	# total observable behavior should span 4 tau
+	# tau is somewhat arbitrarily chosen constant for what seemed to ecapsulate the interesting parts
+	tau = .25
+	# value of 10, in this case, 10mA
 	v = 10
-	sampleCt = int(2*tau4/cee.devInfo['sampleTime'])
-	ss = cee.setOutputArbitrary('b', 'i', [0, tau4/4, tau4/4, 2*tau4], [0, 0, +v, +v], repeat=-1)['startSample']
+	# calculate how many samples are contained in four timesteps
+	sampleCt = int(4*tau/cee.devInfo['sampleTime'])
+	# set a step from 0mA to 10mA to happen at tau/4, measure until 4tau
+	# "ss" is the integer value of the starting sample
+	ss = cee.setOutputArbitrary('b', 'i', [0, tau/4, tau/4, 4*tau], [0, 0, +v, +v], repeat=0)['startSample']
+	# instantiate empty array
 	data = []
 	while True:
+		# inner loop, simply call getCounters, shove the data into the array, break if the sample count is more than our target end point
 		data.append(getCounters())
 		datum = data[-1]
 		if datum[1] > ss+sampleCt:
 			break
+	# get 'sampleCt' samples into lists "v" and "i" with no resampling, starting at the sample point the arbitrary waveform started
 	(v, i) = cee.getInput('b', resample=0, count=sampleCt, start=ss)
+	# normalize to "zero"
 	v = array(v) - zero
+	# generate array of "sampleCt" sample indexes
 	s = arange(ss, sampleCt+ss)
+	# "t" or ticks is the 2nd element in data
 	t = [d[1] for d in data]
+	# "w" or omega is the 1st element
 	w = [d[0] for d in data]
+	# plot motor voltage and current on the same plot
 	plotTwoAxes(s, v, i, "samples", "voltage", "current").show()
+	# generate an abbreviated set of times on the continuum from the first measured sample count to the last
 	x_f = linspace(t[0], t[-1], 100)
+	# fit a spline to our rotations over time data
 	fit = UnivariateSpline(t, w)
+	# show quality of fit
 	figure()
 	plot(x_f, fit(x_f), label="univariate spline fit")
 	xlabel("time (samples)")
@@ -130,6 +161,7 @@ def ACAnalysis():
 	title("position over time")
 	plot(t, w, '.', label="data")
 	legend(loc="best")
+	# use spline as low-jitter source of rotational data capable of being numerically integrated
 	figure()
 	plot(t[1::], diff(w)/diff(t), '.', label='numerically differentiated data')
 	plot(x_f[1::], diff(fit(x_f))/diff(x_f), '-', label='derivative of interpolated and dt-normalized w')
@@ -139,6 +171,3 @@ def ACAnalysis():
 	ylabel("data")
 	legend(loc='best')
 	show()
-
-if __name__ == "__main__":
-	print DCAnalysis()
