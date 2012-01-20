@@ -82,12 +82,9 @@ def DCAnalysis():
 	for v in linspace(-zero, zero, 50):
 		data.append(getDCSample(v, dt))
 	# cleanup
-	v = [d['v'] for d in data]
-	i = [d['i'] for d in data]
-	dw = [d['dw'] for d in data]
-	v = array(v)
-	i = array(i)
-	dw = array(dw)
+	v = array([d['v'] for d in data])
+	i = array([d['i'] for d in data])
+	dw = array([d['dw'] for d in data])
 	f = figure()
 	hold(True)
 	ax1 = f.add_subplot(111)
@@ -102,18 +99,20 @@ def DCAnalysis():
 	ax2.set_ylabel("current draw (mA)", color="b")
 	for tl in ax2.get_yticklabels():
 		tl.set_color('b')
+	# resistance is a least squares fit of voltage and current
 	resistance = polyfit(v, i, 1)
 	ax2.plot(v, polyval(resistance, v), '-', label="resistance fit")
 	legend(loc='best')
 	f.savefig("DCanalysis.png")	
 	print resistance[0], " ohms"
 	i = -i
+	# electrical constant as per the lab instructions
 	k_e = polyfit(v - i*resistance[0], dw, 1)[0]
 	print k_e, "rps per volt"
+	# electrical constant as per my understanding
 	k_e = polyfit(v, dw, 1)[0]
 	print k_e, "rps per volt"
 	legend(loc='best')
-	#show()
 	return data
 
 def ACAnalysis():
