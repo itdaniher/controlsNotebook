@@ -1,0 +1,44 @@
+### characterization of a DC gearmotor
+
+This is the associated procedural documentation for the first lab of Dr. Lundberg's class on feedback countrols.
+
+This lab was intended to provide further experience with DC motors as transducers, offer an experience in the generation and refinement of mathematical models of real-world systems, and lay the groundwork for future explorations in actual servomechanisms.
+
+The measurements lab, as described in the handout [on the course website](http://faculty.olin.edu/klundberg/controls/3370lab1.pdf), is comprised of two sorts of measurements, one DC, attempting to elucidate the steady-state behavior, and one AC, attempting to illuminate mechanical constants through observed behavior to a step input.
+
+Working off of this high level understanding of the measurements to be collected, and my previous work on [Nonolith Labs' CEE](http://nonolithlabs.com/cee), I elected to conduct this lab excercise "wet," with hardware in the loop, rather than predicating my calculations on pre-canned data. This was honestly probably an irrational decision, but one that I felt perfectly justified in given the extent of my efforts in this mixed signal domain.
+
+I built a connector for an old maxon gearmotor, complete with encoder, and modified the firmware on CEE to decode the 16ppr quadrature encoder data into a quasi-absolute position data stream. I stamped this data with an on-device sample counter matching the counter used in the host software, nonolith-connect, to specify start and stop times for sample collection and waveform generation. Running at 40KSPS, this gave an effective timestamp precision of 2.5e-5, and allowed me to ensure that both SMU measurements and position data were in sync.
+
+After emailing Maxxon, I got a datasheet for the motor, suggesting that it is a 12v nominal, 2.5w brushed motor with a 17:1 gearbox and a 16 ppr encoder on the gearbox's input, giving a total of 272 counts per revolution nominal, or 1088 counted edges per revolution with the implemented hardware decoder and firmware.
+
+I used two channels of CEE to control this motor, channel A as a 2v5 low impedance virtual ground, and channel B as my active channel for sourcing and measuring.
+
+
+#### DC
+
+The DC measurement protocol was fairly straight forward. Given a voltage, I would set this voltage relative to the virtual ground, wait "a sufficiently long time" for the system to steadystate, and measure the actual voltage, current, and take two snapshots of the position counter to generate an instantaneous velocity. This data was used to calculate effective motor resistance as well as the electrical constant, Ke. 
+
+The overall fidelity of the measurements seemed reasonable. The curve fit for both winding resistance and Ke were plausible, with a very clear linear relationship between output speed and input voltage. The motor displayed weird nonideal behavior when given low voltages were set across the windings, with a current clsoe to zero instead of the expected current proportional to voltage. This "stickiness" or hysteresis (?) complicated calculations of the motor constant predicated upon motor back EMF voltage. A least squares 1deg polynomial fit was made to the voltage vs. current data and used for all future calculations. This fit was only of moderate quality due to the afformentioned nonlinearities, but gave Ke of the right order of magnitude, most of the time. A more traditional (?) calculation of Ke was executed using the raw terminal-to-terminal motor voltage and the measured speed, giving a very high accuracy fit to the system.
+
+The image [DCanalysis.png]() shows the results of this series of measurements.
+
+#### AC
+
+The AC measurement protocol was more complicated in execution, but still fairly reasonable. In attempting to study higher order behavior, a step of current was put into the motor both with and without an extra inertial mass (flywheel.) The velocity and acceleration were calculated with high coverage. The change in acceleration between the system with and without an additional known inertial mass was used to calculate the inertia of the motor and gearbox. The 10-to-90 velocity rise time in response to a step of current was recorded as 2.2x the motor's mechanical time constant. The motor inductance was calculated by measuring the 10-to-90 settling time of a current waveform in response to a voltage step.
+
+The raw voltage and current data, clearly showing a step, can be found at [timeSeriesVoltageCurrent.png]()
+
+Due to the difficulties associated with numerically differentiating the position dataset, (as shown in [speedNoFlywheel.png]() and [speedPlusFlywheel.png]()) a univariate spline was fit to the time series position data, and this spline was used to provide the information necessary to give sensible low-noise velocity information with continuous coverage. The graph at [timeSeriesPositionWithFit.png]() shows the raw position data and a spline fit.
+
+The practical output of this excercise can be found in [speedNoFlywheel.png]() and [speedPlusFlywheel.png](). These plots show raw numerically differentiated data, the differentiated spline-fit data, and the second derivative of the spline-fit data for the system both with and without the flywheel.
+
+Viewing these plots side by side clearly shows the lower acceleration for the more massive system, and was consistent enough accross sample measurements that I was able to calculate an inertia value for the motor that seemed reasonable. These last two measurements of speed were not normalized to real-world units of angular position and seconds due to the difficulty of simply taking a velocity reading that made sense.  Spline fitting is a gross hack, but it worked well enough to give a sane exponential rise curve for velocity and a fairly constant acceleration in response to a constant current, exactly as expected.
+
+#### Reflections on AC
+
+The clear first optimization would be to simply redo these measurements normalized for real world units. I would like to replace the spline fitting with a better-characterized window'd sinc low pass filter, hopefully giving equally valid velocity data without the kludgyness of fitting an arbitrary polynomial to an otherwise fairly clean dataset. I did explore linear interpolation to fill in for missing samples, but the results were still obnoxiously noisy. A firmware-side modification that I could make would be to modify the quadrature decoder to directly measure rise-to-fall time, giving a direct velocity measurement, instead of counting ticks.
+
+#### Reflections on DC
+
+Overall, I'm fairly pleased with this set of measurements, with the clear and notable exception of the stickiness around zero volts and the otherwise unimpressive current data. If possible, I would redo this lab using a DC gearmotor designed for lower voltages with a lower winding resistance, with unloaded behavior hopefully better within the ideal full scale range of CEE.
