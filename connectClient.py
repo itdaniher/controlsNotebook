@@ -87,8 +87,8 @@ class CEE:
 			raise ValueError("Invalid sample rate")
 
 		sampleTime = 1.0 / sampleRate
-		if sampleTime == self.devInfo['sampleTime']:
-			return True
+		#if sampleTime == self.devInfo['sampleTime']:
+		#	return True
 
 		if sampleTime < self.devInfo.get('minSampleTime', 1.0/40e3):
 			raise ValueError("The device does not support this sample rate.")
