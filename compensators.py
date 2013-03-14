@@ -1,13 +1,11 @@
 # coding=utf-8
 
 import sympy
-from sympy.abc import s#, j
+from sympy.abc import s
 from pylab import *
 from scipy.signal import *
 
 j = sympy.I
-
-blacks = lambda L: L/(1+L)
 
 ct = 10000
 
@@ -45,23 +43,31 @@ def steadyStepError(system):
 
 def reducedGainCompensate(system, target):
 	w, mag, phase = bode(system, n=ct)
+	phase = [i if i < 0 else -(360-i) for i in phase]
+	phase = array(phase)
 	phaseTarget = (-180 + target)
+	print phaseMargin(system)
+	print phaseTarget
 	targetIndex = argmin(abs(phaseTarget - phase))
+	print mag[targetIndex]
 	magnitude = mag[targetIndex]
 	return {"K": 1/magnitude}, 1/magnitude
 
 def dominatePoleCompensate(system, target):
 	w, mag, phase = bode(e2sys(sys2e(system)*1/s), n=ct)
+	phase = [i if i < 0 else -(360-i) for i in phase]
+	phase = array(phase)
 	phaseTarget = (-180 + target)
 	targetIndex = argmin(abs(phaseTarget - phase))
+	print abs(phaseTarget-phase)
 	magnitude = mag[targetIndex]
-	return {"K": 1/magnitude}, magnitude/s
-	
+	return {"K": 1/magnitude}, (1/magnitude)*1/s
 
 def lagCompensate(system, target):
 	w, mag, phase = bode(system, n=ct)
+	phase = [i if i < 0 else -(360-i) for i in phase]
+	phase = array(phase)
 	phaseTarget = (-180 + (target - 6)) # find location of new crossing goal; extra '-6' is from 10/wc rule
-	print phaseTarget
 	phaseTargetLocation = argmin(abs(phaseTarget - phase)) 
 	tau = 10/w[phaseTargetLocation]
 	for alpha in logspace(0, 2, ct): 
@@ -110,23 +116,25 @@ def characterize(system, f=figure(), color="k", labeled=""):
 
 
 print "before :"
-G_p = 1/(s**2*(s+100))
+G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
 print phaseMargin(e2sys(G_p))
 print steadyStepError(e2sys(G_p))
 characterize(e2sys(G_p), color="k", labeled="uncompensated")
 print "leadCompensate"
-(coeffs, G_c) = leadCompensate(e2sys(G_p), 30)
+(coeffs, G_c) = leadCompensate(e2sys(G_p), 45)
 print coeffs
 print phaseMargin(e2sys(G_p*G_c))
 print steadyStepError(e2sys(G_p*G_c))
 characterize(e2sys(G_p*G_c), color="b", labeled="lead")
 print "reducedGain"
-(coeffs, G_c) = reducedGainCompensate(e2sys(G_p), 30)
+(coeffs, G_c) = reducedGainCompensate(e2sys(G_p), 45)
+print coeffs
 print phaseMargin(e2sys(G_p*G_c))
 print steadyStepError(e2sys(G_p*G_c))
 characterize(e2sys(G_p*G_c), color='r', labeled="reducedGain")
 print "majorPole"
-(coeffs, G_c) = dominatePoleCompensate(e2sys(G_p), 30)
+(coeffs, G_c) = dominatePoleCompensate(e2sys(G_p), 45)
+print coeffs
 print phaseMargin(e2sys(G_p*G_c))
 print steadyStepError(e2sys(G_p*G_c))
 characterize(e2sys(G_p*G_c), color='g', labeled="majorPole")
