@@ -39,6 +39,25 @@ def phaseMargin(system):
 	crossingPoint = argmin(abs(mag)) # point where magnitude is closest to 0dB
 	return {"w_c": w[crossingPoint], "p_m": 180+phase[crossingPoint]}
 
+def steadyStepError(system):
+	fvt = eeval(sys2e(system), 0)[0]
+	return {"sse": 1/(1+fvt)}
+
+def reducedGainCompensate(system, target):
+	w, mag, phase = bode(system, n=ct)
+	phaseTarget = (-180 + target)
+	targetIndex = argmin(abs(phaseTarget - phase))
+	magnitude = mag[targetIndex]
+	return {"K": 1/magnitude}, 1/magnitude
+
+def dominatePoleCompensate(system, target):
+	w, mag, phase = bode(e2sys(sys2e(system)*1/s), n=ct)
+	phaseTarget = (-180 + target)
+	targetIndex = argmin(abs(phaseTarget - phase))
+	magnitude = mag[targetIndex]
+	return {"K": 1/magnitude}, magnitude/s
+	
+
 def lagCompensate(system, target):
 	w, mag, phase = bode(system, n=ct)
 	phaseTarget = (-180 + (target - 6)) # find location of new crossing goal; extra '-6' is from 10/wc rule
@@ -69,49 +88,47 @@ def leadCompensate(system, target):
 	G_c = K_l * (alpha*tau*s+1)/(tau*s+1)
 	return {"K_l": K_l, "alpha": alpha, "tau":tau}, G_c
 
-def characterize(system):
-	""" draw impulse, step, bode for a given scipy.signal.lti instance. """
-	adjustprops = dict(left=0.1, bottom=0.1, right=0.97, top=0.93, hspace=0.5)
-	f = figure()
+def characterize(system, f=figure(), color="k", labeled=""):
+	""" draw bode plot for a given scipy.signal.lti instance. """
+	adjustprops = dict(left=0.1, bottom=0.1, right=0.97, top=0.93, hspace=0.2)
 	f.subplots_adjust(**adjustprops)
-	impulsePlot = f.add_subplot(4, 1, 1)
-	stepPlot = f.add_subplot(4, 1, 2, sharex=impulsePlot)
-	magPlot = f.add_subplot(4, 1, 3)
-	phasePlot = f.add_subplot(4, 1, 4, sharex=magPlot)
+	magPlot = f.add_subplot(2, 1, 1)
+	phasePlot = f.add_subplot(2, 1, 2, sharex=magPlot)
 	w, mag, phase = bode(system)
 	phase = [i if i < 0 else -(360-i) for i in phase]
 	tImpulse, youtImpulse = impulse2(system)
 	tStep, youtStep = step2(system)
-	impulsePlot.plot(tImpulse,youtImpulse)
-	impulsePlot.set_title("impulse")
-	impulsePlot.set_ylabel("amplitude")
-	stepPlot.plot(tStep, youtStep)
-	stepPlot.set_title("step")
-	stepPlot.set_xlabel("seconds")
-	stepPlot.set_ylabel("amplitude")
-	magPlot.semilogx(w, mag)
+	magPlot.semilogx(w, mag, label=labeled, color=color)
 	magPlot.set_title("magnitude")
 	magPlot.set_ylabel("amplitude")
-	phasePlot.semilogx(w, phase)
+	phasePlot.semilogx(w, phase, label=labeled, color=color)
 	phasePlot.set_title("phase")
 	phasePlot.set_xlabel("radians per second")
 	phasePlot.set_ylabel("degrees")
 	setp(magPlot.get_xticklabels(), visible=False)
-	setp(impulsePlot.get_xticklabels(), visible=False)
-	show()
+	legend(loc="best")
 
-G_p = 10/(s*(s+1)*(0.1*s+1))
 
-system = e2sys(G_p)
-
-print phaseMargin(system)
-# should be tau=16.9, alpha=14 for lag compensation
-#print lagCompensate(system,50)
-# should be tau =  0.086, K_l = 0.47, alpha = 10
-#print leadCompensate(system, 50)
-
-G_c = leadCompensate(system, 50)[-1]
-
+print "before :"
+G_p = 1/(s**2*(s+100))
+print phaseMargin(e2sys(G_p))
+print steadyStepError(e2sys(G_p))
+characterize(e2sys(G_p), color="k", labeled="uncompensated")
+print "leadCompensate"
+(coeffs, G_c) = leadCompensate(e2sys(G_p), 30)
+print coeffs
 print phaseMargin(e2sys(G_p*G_c))
+print steadyStepError(e2sys(G_p*G_c))
+characterize(e2sys(G_p*G_c), color="b", labeled="lead")
+print "reducedGain"
+(coeffs, G_c) = reducedGainCompensate(e2sys(G_p), 30)
+print phaseMargin(e2sys(G_p*G_c))
+print steadyStepError(e2sys(G_p*G_c))
+characterize(e2sys(G_p*G_c), color='r', labeled="reducedGain")
+print "majorPole"
+(coeffs, G_c) = dominatePoleCompensate(e2sys(G_p), 30)
+print phaseMargin(e2sys(G_p*G_c))
+print steadyStepError(e2sys(G_p*G_c))
+characterize(e2sys(G_p*G_c), color='g', labeled="majorPole")
 
-characterize(e2sys(G_p*G_c))
+show()
