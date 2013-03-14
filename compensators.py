@@ -46,11 +46,9 @@ def reducedGainCompensate(system, target):
 	phase = [i if i < 0 else -(360-i) for i in phase]
 	phase = array(phase)
 	phaseTarget = (-180 + target)
-	print phaseMargin(system)
-	print phaseTarget
 	targetIndex = argmin(abs(phaseTarget - phase))
-	print mag[targetIndex]
 	magnitude = mag[targetIndex]
+	magnitude = 10**(magnitude/20)
 	return {"K": 1/magnitude}, 1/magnitude
 
 def dominatePoleCompensate(system, target):
@@ -59,8 +57,8 @@ def dominatePoleCompensate(system, target):
 	phase = array(phase)
 	phaseTarget = (-180 + target)
 	targetIndex = argmin(abs(phaseTarget - phase))
-	print abs(phaseTarget-phase)
 	magnitude = mag[targetIndex]
+	magnitude = 10**(magnitude/20)
 	return {"K": 1/magnitude}, (1/magnitude)*1/s
 
 def lagCompensate(system, target):
@@ -70,12 +68,12 @@ def lagCompensate(system, target):
 	phaseTarget = (-180 + (target - 6)) # find location of new crossing goal; extra '-6' is from 10/wc rule
 	phaseTargetLocation = argmin(abs(phaseTarget - phase)) 
 	tau = 10/w[phaseTargetLocation]
-	for alpha in logspace(0, 2, ct): 
+	for alpha in logspace(-2, 5, ct): 
 		# equation for basic lag compensator
 		G_c = (tau*s+1)/(alpha*tau*s+1)
-		if abs(phaseMargin(e2sys(G_p*G_c))[1]-target) < 0.1:
+		if abs(phaseMargin(e2sys(G_p*G_c))['p_m']-target) < 0.1:
 			break
-	return {"alpha": alpha, "tau": tau}
+	return {"alpha": alpha, "tau": tau}, G_c
 
 def leadCompensate(system, target):
 	# alpha = 10 for 55 degrees phase margin
@@ -120,6 +118,12 @@ G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
 print phaseMargin(e2sys(G_p))
 print steadyStepError(e2sys(G_p))
 characterize(e2sys(G_p), color="k", labeled="uncompensated")
+print "lagCompensate"
+(coeffs, G_c) = lagCompensate(e2sys(G_p), 45)
+print coeffs
+print phaseMargin(e2sys(G_p*G_c))
+print steadyStepError(e2sys(G_p*G_c))
+characterize(e2sys(G_p*G_c), color="b", labeled="lag")
 print "leadCompensate"
 (coeffs, G_c) = leadCompensate(e2sys(G_p), 45)
 print coeffs
@@ -138,5 +142,4 @@ print coeffs
 print phaseMargin(e2sys(G_p*G_c))
 print steadyStepError(e2sys(G_p*G_c))
 characterize(e2sys(G_p*G_c), color='g', labeled="majorPole")
-
 show()
