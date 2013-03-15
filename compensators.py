@@ -112,34 +112,22 @@ def characterize(system, f=figure(), color="k", labeled=""):
 	setp(magPlot.get_xticklabels(), visible=False)
 	legend(loc="best")
 
-
-print "before :"
-G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
-print phaseMargin(e2sys(G_p))
-print steadyStepError(e2sys(G_p))
-characterize(e2sys(G_p), color="k", labeled="uncompensated")
-print "lagCompensate"
-(coeffs, G_c) = lagCompensate(e2sys(G_p), 45)
-print coeffs
-print phaseMargin(e2sys(G_p*G_c))
-print steadyStepError(e2sys(G_p*G_c))
-characterize(e2sys(G_p*G_c), color="b", labeled="lag")
-print "leadCompensate"
-(coeffs, G_c) = leadCompensate(e2sys(G_p), 45)
-print coeffs
-print phaseMargin(e2sys(G_p*G_c))
-print steadyStepError(e2sys(G_p*G_c))
-characterize(e2sys(G_p*G_c), color="b", labeled="lead")
-print "reducedGain"
-(coeffs, G_c) = reducedGainCompensate(e2sys(G_p), 45)
-print coeffs
-print phaseMargin(e2sys(G_p*G_c))
-print steadyStepError(e2sys(G_p*G_c))
-characterize(e2sys(G_p*G_c), color='r', labeled="reducedGain")
-print "majorPole"
-(coeffs, G_c) = dominatePoleCompensate(e2sys(G_p), 45)
-print coeffs
-print phaseMargin(e2sys(G_p*G_c))
-print steadyStepError(e2sys(G_p*G_c))
-characterize(e2sys(G_p*G_c), color='g', labeled="majorPole")
-show()
+if __name__ == "__main__":
+	print "before :"
+	G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
+	print phaseMargin(e2sys(G_p))
+	print steadyStepError(e2sys(G_p))
+	characterize(e2sys(G_p), color="k", labeled="uncompensated")
+	print "leadCompensate"
+	(coeffs, G_c) = leadCompensate(e2sys(G_p), 45)
+	print coeffs
+	print phaseMargin(e2sys(G_p*G_c))
+	print steadyStepError(e2sys(G_p*G_c))
+	characterize(e2sys(G_p*G_c), color="b", labeled="lead")
+	print "lagCompensate"
+	(coeffs, G_c) = lagCompensate(e2sys(G_p), 45)
+	print coeffs
+	print phaseMargin(e2sys(G_p*G_c))
+	print steadyStepError(e2sys(G_p*G_c))
+	characterize(e2sys(G_p*G_c), color="b", labeled="lag")
+	show()
