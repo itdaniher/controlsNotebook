@@ -34,7 +34,8 @@ def bode(expression, n = 10):
 
 def e2sys(expression):
 	""" basic helper function that accepts a sympy expression, expands it, 
-	attempts to simplify it, and returns a scipy-type LTI system equivalent. """
+	attempts to simplify it, and returns a numerator and denomenator pair for the instantiation of a scipy
+	LTI system object. """
 	expression = expression.expand()
 	expression = expression.cancel()
 	n = sympy.Poly(sympy.numer(expression), s).all_coeffs()
@@ -56,11 +57,13 @@ def phaseMargin(expression):
 	return {"w_c": w[crossingPoint], "p_m": phase[crossingPoint]+180}
 
 def steadyStepError(expression):
+	""" use sympy's symbolic solver at 0 to determine steady state error to a step. """
 	e = expression.subs(s, j*0)
 	fvt = float(sympy.Abs(e))
 	return {"sse": 1/(1+fvt)}
 
 def reducedGainCompensate(expression, target):
+	""" find the uncompensated system's magnitude at the right phase to give the right margin, normalize against it"""
 	w, mag, phase = bode(expression, n=ct)
 	phaseTarget = (-180 + target)
 	targetIndex = argmin(abs(phaseTarget - phase))
@@ -69,18 +72,14 @@ def reducedGainCompensate(expression, target):
 	return {"K": 1/magnitude}, 1/magnitude
 
 def dominatePoleCompensate(expression, target):
-	w, mag, phase = bode(expression*1/s, n=ct)
-	phaseTarget = (-180 + target)
-	targetIndex = argmin(abs(phaseTarget - phase))
-	magnitude = mag[targetIndex]
-	magnitude = 10**(magnitude/20)
-	return {"K": 1/magnitude}, (1/magnitude)*1/s
+	""" add a pole, call reducedGainCompensate"""
+	K = reducedGainCompensate(1/s*expression, target)[0]['K']
+	return {"K": K}, K/s
 
 def lagCompensate(expression, target):
 	w, mag, phase = bode(expression, n=ct)
 	phaseTarget = -180 + (target + 6) # find location of new crossing goal; extra '-6' is from 10/wc rule
 	targetIndex = argmin(abs(phaseTarget - phase))
-	print phaseTarget, phase[targetIndex]
 	w_c = w[targetIndex]
 	tau = 10/w_c
 	# equation for basic lag compensator
@@ -96,8 +95,7 @@ def leadCompensate(expression, target):
 	targetIndex = argmin(abs(phase-phaseTarget))
 	w_c = w[targetIndex]
 	tau = 1 / (sqrt(alpha) * w_c)
-	K_l = 1
-	G_c = K_l * (alpha*tau*s+1)/(tau*s+1)
+	G_c = (alpha*tau*s+1)/(tau*s+1)
 	# get magnitude of loop transfer function L(s) at w_c
 	K_l = 1/ eeval(G_c*expression, w_c)[0] 
 	# equation for basic lead compensator
@@ -141,4 +139,10 @@ if __name__ == "__main__":
 	print phaseMargin(G_p*G_c)
 	print steadyStepError(G_p*G_c)
 	drawBode(G_p*G_c, color="r", labeled="lag")
+	print "reducedGain"
+	(coeffs, G_c) = dominatePoleCompensate(G_p, 50)
+	print coeffs
+	print phaseMargin(G_p*G_c)
+	print steadyStepError(G_p*G_c)
+	drawBode(G_p*G_c, color="g", labeled="dominatePole")
 	show()
