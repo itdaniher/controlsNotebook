@@ -13,14 +13,14 @@ decibels = lambda lin: 20*numpy.log10(norm(lin))
 
 def eeval(expression, w):
 	""" evaluate a sympy expression at omega. return magnitude, phase."""
-	num, den = e2sys(expression)
+	num, den = e2nd(expression)
 	y = numpy.polyval(num, 1j*w) / numpy.polyval(den, 1j*w)
 	phase = numpy.arctan2(y.imag, y.real) * 180.0 / numpy.pi
 	mag = abs(y)
 	return mag, phase
 
 def bode(expression, n = 10):
-	freqs = signal.findfreqs(e2sys(expression)[0], e2sys(expression)[1], n)
+	freqs = signal.findfreqs(e2nd(expression)[0], e2nd(expression)[1], n)
 	magnitude = numpy.array([])
 	phase = numpy.array([])
 	for freq in freqs:
@@ -32,7 +32,7 @@ def bode(expression, n = 10):
 	magnitude = array(map(decibels, magnitude))
 	return freqs, magnitude, phase
 
-def e2sys(expression):
+def e2nd(expression):
 	""" basic helper function that accepts a sympy expression, expands it, 
 	attempts to simplify it, and returns a numerator and denomenator pair for the instantiation of a scipy
 	LTI system object. """
@@ -57,9 +57,11 @@ def phaseMargin(expression):
 	return {"w_c": w[crossingPoint], "p_m": phase[crossingPoint]+180}
 
 def steadyStepError(expression):
-	""" use sympy's symbolic solver at 0 to determine steady state error to a step. """
-	e = expression.subs(s, j*0)
-	fvt = float(sympy.Abs(e))
+	""" use sympy to determine limit at 0. """
+	#e = expression.subs(s, j*0)
+	#fvt = float(sympy.Abs(e))
+	fvt = sympy.limit(expression, s, 0)
+	fvt = float(fvt)
 	return {"sse": 1/(1+fvt)}
 
 def reducedGainCompensate(expression, target):
@@ -122,8 +124,8 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 
 if __name__ == "__main__":
 	print "before :"
-	#G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
-	G_p = 10/(s*(s+1)*(0.1*s+1))
+	G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
+	#G_p = 10/(s*(s+1)*(0.1*s+1))
 	print phaseMargin(G_p)
 	print steadyStepError(G_p)
 	drawBode(G_p, color="k", labeled="uncompensated")
