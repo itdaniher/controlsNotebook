@@ -10,7 +10,6 @@ j = sympy.I
 
 ct = 500
 
-
 def eeval(expression, w):
 	""" evaluate a sympy expression at omega. return magnitude, phase."""
 	num, den = e2nd(expression)
@@ -129,9 +128,16 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 	legend(loc="best")
 
 if __name__ == "__main__":
-	L_s = ((1/33)/(s*(s**2+0.1*s+1)))
+	L_s = ((1/11)/(s*(s**2+0.1*s+1)))
 	print gainMargin(L_s)
 	drawBode(L_s)
+	figure()
+	from nichols import nichols_grid
+	nichols_grid()
+	w, mag, phase = bode(L_s*1/3, n=ct)
+	plot(phase, mag)	
+	w, mag, phase = bode(L_s, n=ct)
+	plot(phase, mag)	
 	show()
 
 if 0: 
