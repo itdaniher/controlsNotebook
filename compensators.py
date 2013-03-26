@@ -1,15 +1,15 @@
 # coding=utf-8
-
+from __future__ import division
 import sympy
 from sympy.abc import s
 from pylab import *
 import numpy
 import scipy.signal as signal
+import pprint
 j = sympy.I
 
-ct = 1000
+ct = 500
 
-decibels = lambda lin: 20*numpy.log10(norm(lin))
 
 def eeval(expression, w):
 	""" evaluate a sympy expression at omega. return magnitude, phase."""
@@ -20,7 +20,9 @@ def eeval(expression, w):
 	return mag, phase
 
 def bode(expression, n = 10):
-	freqs = signal.findfreqs(e2nd(expression)[0], e2nd(expression)[1], n)
+	decibels = lambda lin: 20*numpy.log10(norm(lin))
+	num, den = e2nd(expression)
+	freqs = signal.findfreqs(num, den, n)
 	magnitude = numpy.array([])
 	phase = numpy.array([])
 	for freq in freqs:
@@ -56,13 +58,17 @@ def phaseMargin(expression):
 	crossingPoint = argmin(abs(mag)) # point where magnitude is closest to 0dB
 	return {"w_c": w[crossingPoint], "p_m": phase[crossingPoint]+180}
 
-def steadyStepError(expression):
+def gainMargin(expression):
+	w, mag, phase = bode(expression, n=ct)
+	unstablePoint = argmin(abs(-phase-180))
+	return {"w": w[unstablePoint], "g_m": -mag[unstablePoint]}
+
+def steadyStateError(expression):
 	""" use sympy to determine limit at 0. """
-	#e = expression.subs(s, j*0)
-	#fvt = float(sympy.Abs(e))
-	fvt = sympy.limit(expression, s, 0)
-	fvt = float(fvt)
-	return {"sse": 1/(1+fvt)}
+	errors = {}
+	for order, name in enumerate(['dc', 'step', 'ramp', 'parabola']):
+		errors[name] = 1/(1+sympy.limit(s*expression*1/s**order, s, 0))
+	return errors #{"sse": 1/(1+fvt)}
 
 def reducedGainCompensate(expression, target):
 	""" find the uncompensated system's magnitude at the right phase to give the right margin, normalize against it"""
@@ -106,12 +112,12 @@ def leadCompensate(expression, target):
 
 def drawBode(expression, f=figure(), color="k", labeled=""):
 	""" draw bode plot for a given scipy.signal.lti instance. """
+	latexed = sympy.latex(sympy.factor(expression))
 	adjustprops = dict(left=0.1, bottom=0.1, right=0.97, top=0.93, hspace=0.2)
 	f.subplots_adjust(**adjustprops)
 	magPlot = f.add_subplot(2, 1, 1)
 	phasePlot = f.add_subplot(2, 1, 2, sharex=magPlot)
-	w, mag, phase = bode(expression)
-	phase = [i if i < 0 else -(360-i) for i in phase]
+	w, mag, phase = bode(expression, n=ct)
 	magPlot.semilogx(w, mag, label=labeled, color=color)
 	magPlot.set_title("magnitude")
 	magPlot.set_ylabel("amplitude (dB)")
@@ -123,28 +129,34 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 	legend(loc="best")
 
 if __name__ == "__main__":
+	L_s = ((1/33)/(s*(s**2+0.1*s+1)))
+	print gainMargin(L_s)
+	drawBode(L_s)
+	show()
+
+if 0: 
 	print "before :"
 	G_p = 100/((s+1)*(0.1*s+1)*(0.01*s+1))
 	#G_p = 10/(s*(s+1)*(0.1*s+1))
 	print phaseMargin(G_p)
-	print steadyStepError(G_p)
+	print steadyStateError(G_p)
 	drawBode(G_p, color="k", labeled="uncompensated")
 	print "leadCompensate"
 	(coeffs, G_c) = leadCompensate(G_p, 50)
 	print coeffs
 	print phaseMargin(G_p*G_c)
-	print steadyStepError(G_p*G_c)
+	print steadyStateError(G_p*G_c)
 	drawBode(G_p*G_c, color="b", labeled="lead")
 	print "lagCompensate"
 	(coeffs, G_c) = lagCompensate(G_p, 50)
 	print coeffs
 	print phaseMargin(G_p*G_c)
-	print steadyStepError(G_p*G_c)
+	print steadyStateError(G_p*G_c)
 	drawBode(G_p*G_c, color="r", labeled="lag")
 	print "reducedGain"
 	(coeffs, G_c) = dominatePoleCompensate(G_p, 50)
 	print coeffs
 	print phaseMargin(G_p*G_c)
-	print steadyStepError(G_p*G_c)
+	print steadyStateError(G_p*G_c)
 	drawBode(G_p*G_c, color="g", labeled="dominatePole")
 	show()
