@@ -151,15 +151,23 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 	plot(phase,mag)
 
 if __name__ == "pset6":
+	""" to find a compensator useful to stabilize the transfer functions given, 
+	I attempted to identify the location of relevant poles and zeros and compare them to the
+	poles and zeros offered by the provided compensators.
+	I then plotted the possible closed-loop transfer function with a K of 1 and observed the difference
+	in magnitude between the magnitude of the system at the target crossover point and the 0dB line, and
+	estimated a "K" value that provided an appropriate zerocrossing. I verified this estimation via margin calculations."""
 	#G_c = 1/s # a
 	#G_c = (10*s+1)/(100*s+1) # c
 	#G_c = (0.01*s+1)/(0.001*s+1) # d
+	G_c = 1
+	K = 1
 	G_p = 1/s**2 # p1 - d; k = 10000
 	G_p = pade(1, 10) # p2 - a; 1/2
 	G_p = 10**4/(s*(s**2+2*s+10**4)) # p3 - c; k = 1/100
 	G_p = (1-0.1*s)/(1+0.1*s) # p4 - a; k = 2
 	G_p = 1/((0.1*s+1)*(0.1*s-1)) # p5 - d; k=1000
-	L_s = G_p * G_c
+	L_s = G_p * G_c * K
 	print phaseMargin(L_s)
 	print gainMargin(L_s)
 	drawBode(L_s)
