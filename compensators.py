@@ -8,6 +8,7 @@ import numpy
 import scipy.signal as signal
 import pprint
 j = sympy.I
+from nichols import nichols_grid
 
 ct = 500
 
@@ -145,26 +146,29 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 	phasePlot.set_ylabel("degrees")
 	setp(magPlot.get_xticklabels(), visible=False)
 	legend(loc="best")
+	figure()
+	nichols_grid()
+	plot(phase,mag)
 
-if __name__ == "__main__":
-	p = pade(2, 20)
-	t,y = signal.step2(e2nd(p))
-	plot(t,y)
-	show()
-
-
-
-if 0:
-	L_s = ((1/11)/(s*(s**2+0.1*s+1)))
+if __name__ == "pset6":
+	#G_c = 1/s # a
+	#G_c = (10*s+1)/(100*s+1) # c
+	#G_c = (0.01*s+1)/(0.001*s+1) # d
+	G_p = 1/s**2 # p1 - d; k = 10000
+	G_p = pade(1, 10) # p2 - a; 1/2
+	G_p = 10**4/(s*(s**2+2*s+10**4)) # p3 - c; k = 1/100
+	G_p = (1-0.1*s)/(1+0.1*s) # p4 - a; k = 2
+	G_p = 1/((0.1*s+1)*(0.1*s-1)) # p5 - d; k=1000
+	L_s = G_p * G_c
+	print phaseMargin(L_s)
 	print gainMargin(L_s)
 	drawBode(L_s)
-	figure()
-	from nichols import nichols_grid
-	nichols_grid()
-	w, mag, phase = bode(L_s*1/3, n=ct)
-	plot(phase, mag)	
-	w, mag, phase = bode(L_s, n=ct)
-	plot(phase, mag)	
+	show()
+
+if 0:
+	p = pade(2, 10)
+	t,y = signal.step2(e2nd(p))
+	plot(t,y)
 	show()
 
 if 0: 
