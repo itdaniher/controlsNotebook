@@ -3,12 +3,16 @@ from __future__ import division
 import sympy
 from sympy.abc import s
 from pylab import *
+import sympy.mpmath as mpmath
 import numpy
 import scipy.signal as signal
 import pprint
 j = sympy.I
 
 ct = 500
+
+mpmath.mp.dps = 40;
+mpmath.mp.pretty = True
 
 def eeval(expression, w):
 	""" evaluate a sympy expression at omega. return magnitude, phase."""
@@ -44,6 +48,21 @@ def e2nd(expression):
 	n = map(float, n)
 	d = map(float, d)
 	return (n, d)
+
+def pade(t, n):
+	""" pade approximation of a time delay, as per mathworks' controls toolkit.
+	supports arbitrary precision mathematics via mpmath and sympy"
+	for more information, see:
+		* http://home.hit.no/~hansha/documents/control/theory/pade_approximation.pdf 
+		* http://www.mathworks.com/help/control/ref/pade.html
+	"""
+	# e**(s*t) -> laplace transform of a time delay with 't' duration
+	# e**x -> taylor series
+	taylor = mpmath.taylor(sympy.exp, 0, n*2)
+	(num, den) = mpmath.pade(taylor, n, n)
+	num = sum([x*(-t*s)**y for y,x in enumerate(num[::-1])])
+	den = sum([x*(-t*s)**y for y,x in enumerate(den[::-1])])
+	return num/den
 
 def sys2e(system):
 	""" basic helper function that accepts an instance of the scipy.signal.lti class
@@ -128,6 +147,14 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 	legend(loc="best")
 
 if __name__ == "__main__":
+	p = pade(2, 20)
+	t,y = signal.step2(e2nd(p))
+	plot(t,y)
+	show()
+
+
+
+if 0:
 	L_s = ((1/11)/(s*(s**2+0.1*s+1)))
 	print gainMargin(L_s)
 	drawBode(L_s)
