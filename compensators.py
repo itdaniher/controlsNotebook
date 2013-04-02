@@ -2,7 +2,7 @@
 from __future__ import division
 import sympy
 from sympy.abc import s
-from pylab import *
+from matplotlib import pyplot
 import sympy.mpmath as mpmath
 import numpy
 import scipy.signal as signal
@@ -24,7 +24,7 @@ def eeval(expression, w):
 	return mag, phase
 
 def bode(expression, n = 10):
-	decibels = lambda lin: 20*numpy.log10(norm(lin))
+	decibels = lambda lin: 20*numpy.log10(numpy.abs(lin))
 	num, den = e2nd(expression)
 	freqs = signal.findfreqs(num, den, n)
 	magnitude = numpy.array([])
@@ -35,7 +35,7 @@ def bode(expression, n = 10):
 		if p >= 0:
 			p = -360+p
 		phase = numpy.append(phase, p)
-	magnitude = array(map(decibels, magnitude))
+	magnitude = numpy.array(map(decibels, magnitude))
 	return freqs, magnitude, phase
 
 def e2nd(expression):
@@ -72,14 +72,17 @@ def sys2e(system):
 	num = sum([x*s**y for y,x in enumerate(system.num[::-1])])
 	return sympy.factor(num/den)
 
+def findZero(arr):
+	return numpy.argmin(numpy.abs(arr))
+
 def phaseMargin(expression):
 	w, mag, phase = bode(expression, n=ct)
-	crossingPoint = argmin(abs(mag)) # point where magnitude is closest to 0dB
+	crossingPoint = findZero(mag) # point where magnitude is closest to 0dB
 	return {"w_c": w[crossingPoint], "p_m": phase[crossingPoint]+180}
 
 def gainMargin(expression):
 	w, mag, phase = bode(expression, n=ct)
-	unstablePoint = argmin(abs(-phase-180))
+	unstablePoint = findZero(-phase-180)
 	return {"w": w[unstablePoint], "g_m": -mag[unstablePoint]}
 
 def steadyStateError(expression):
@@ -93,7 +96,7 @@ def reducedGainCompensate(expression, target):
 	""" find the uncompensated system's magnitude at the right phase to give the right margin, normalize against it"""
 	w, mag, phase = bode(expression, n=ct)
 	phaseTarget = (-180 + target)
-	targetIndex = argmin(abs(phaseTarget - phase))
+	targetIndex = findZero(phaseTarget - phase)
 	magnitude = mag[targetIndex]
 	magnitude = 10**(magnitude/20)
 	return {"K": 1/magnitude}, 1/magnitude
@@ -106,7 +109,7 @@ def dominatePoleCompensate(expression, target):
 def lagCompensate(expression, target):
 	w, mag, phase = bode(expression, n=ct)
 	phaseTarget = -180 + (target + 6) # find location of new crossing goal; extra '-6' is from 10/wc rule
-	targetIndex = argmin(abs(phaseTarget - phase))
+	targetIndex = findZero(phaseTarget - phase)
 	w_c = w[targetIndex]
 	tau = 10/w_c
 	# equation for basic lag compensator
@@ -119,7 +122,7 @@ def leadCompensate(expression, target):
 	w, mag, phase = bode(expression, n=ct)
 	alpha = 10
 	phaseTarget = -(180 + (55 - target))
-	targetIndex = argmin(abs(phase-phaseTarget))
+	targetIndex = findZero(phase-phaseTarget)
 	w_c = w[targetIndex]
 	tau = 1 / (sqrt(alpha) * w_c)
 	G_c = (alpha*tau*s+1)/(tau*s+1)
@@ -129,13 +132,12 @@ def leadCompensate(expression, target):
 	G_c = K_l * (alpha*tau*s+1)/(tau*s+1)
 	return {"K_l": K_l, "alpha": alpha, "tau":tau}, G_c
 
-def drawBode(expression, f=figure(), color="k", labeled=""):
+def drawBode(expression, f1=pyplot.figure(), color="k", labeled=""):
 	""" draw bode plot for a given scipy.signal.lti instance. """
-	latexed = sympy.latex(sympy.factor(expression))
 	adjustprops = dict(left=0.1, bottom=0.1, right=0.97, top=0.93, hspace=0.2)
-	f.subplots_adjust(**adjustprops)
-	magPlot = f.add_subplot(2, 1, 1)
-	phasePlot = f.add_subplot(2, 1, 2, sharex=magPlot)
+	f1.subplots_adjust(**adjustprops)
+	magPlot = f1.add_subplot(2, 1, 1)
+	phasePlot = f1.add_subplot(2, 1, 2, sharex=magPlot)
 	w, mag, phase = bode(expression, n=ct)
 	magPlot.semilogx(w, mag, label=labeled, color=color)
 	magPlot.set_title("magnitude")
@@ -144,11 +146,16 @@ def drawBode(expression, f=figure(), color="k", labeled=""):
 	phasePlot.set_title("phase")
 	phasePlot.set_xlabel("radians per second")
 	phasePlot.set_ylabel("degrees")
-	setp(magPlot.get_xticklabels(), visible=False)
-	legend(loc="best")
-	figure()
+	pyplot.setp(magPlot.get_xticklabels(), visible=False)
+	pyplot.legend(loc="best")
+	f1.savefig("./figure1.png", dpi = 300)
+	f2 = pyplot.figure()
 	nichols_grid()
-	plot(phase,mag)
+	pyplot.plot(phase,mag)
+	f2.savefig("./figure2.png", dpi = 300)
+	return f1, f2
+
+__name__ = "pset6"
 
 if __name__ == "pset6":
 	""" to find a compensator useful to stabilize the transfer functions given, 
@@ -171,7 +178,6 @@ if __name__ == "pset6":
 	print phaseMargin(L_s)
 	print gainMargin(L_s)
 	drawBode(L_s)
-	show()
 
 if 0:
 	p = pade(2, 10)
