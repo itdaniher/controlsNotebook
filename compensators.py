@@ -10,10 +10,12 @@ import pprint
 j = sympy.I
 from nichols import nichols_grid
 
-ct = 500
+ct = 1000
 
 mpmath.mp.dps = 40;
 mpmath.mp.pretty = True
+
+blacks = lambda G_s, H_s: G_s/(1+G_s*H_s)
 
 def eeval(expression, w):
 	""" evaluate a sympy expression at omega. return magnitude, phase."""
@@ -32,8 +34,8 @@ def bode(expression, n = 10):
 	for freq in freqs:
 		(m, p) = eeval(expression, freq)
 		magnitude = numpy.append(magnitude, m)
-		if p >= 0:
-			p = -360+p
+		#if p >= 0:
+		#	p = -360+p
 		phase = numpy.append(phase, p)
 	magnitude = numpy.array(map(decibels, magnitude))
 	return freqs, magnitude, phase
@@ -124,7 +126,7 @@ def leadCompensate(expression, target):
 	phaseTarget = -(180 + (55 - target))
 	targetIndex = findZero(phase-phaseTarget)
 	w_c = w[targetIndex]
-	tau = 1 / (sqrt(alpha) * w_c)
+	tau = 1 / (numpy.sqrt(alpha) * w_c)
 	G_c = (alpha*tau*s+1)/(tau*s+1)
 	# get magnitude of loop transfer function L(s) at w_c
 	K_l = 1/ eeval(G_c*expression, w_c)[0] 
@@ -149,13 +151,75 @@ def drawBode(expression, f1=pyplot.figure(), color="k", labeled=""):
 	pyplot.setp(magPlot.get_xticklabels(), visible=False)
 	pyplot.legend(loc="best")
 	f1.savefig("./figure1.png", dpi = 300)
-	f2 = pyplot.figure()
-	nichols_grid()
-	pyplot.plot(phase,mag)
-	f2.savefig("./figure2.png", dpi = 300)
-	return f1, f2
+	#f2 = pyplot.figure()
+	#nichols_grid()
+	#pyplot.plot(phase,mag)
+	#f2.savefig("./figure2.png", dpi = 300)
+	return f1#, f2
 
-__name__ = "pset6"
+__name__ = "PS7P2"
+
+if __name__ == "PS7P1":
+	# G/1+GH -> 1/H
+	# H_s2*G_s2*1/H_s1 = 1
+	# 1A
+	k = 1
+	tau = 10**-4
+	G_s1 = 1/(tau*s+1)**2
+	H_s1 = k*s 
+	G_s2 = 10**6
+	H_s2 = 0.01 
+	openLoop = H_s2*G_s2*1/H_s1
+	k = eeval(openLoop, 10**6)[0]
+	# 0.01
+	print "k = ", k
+	H_s1 = k*s 
+	system = H_s2*G_s2*blacks(G_s1, H_s1)
+	# 0.001
+	print "dynamic tracking error = ", 1/(1+eeval(system, 10**3)[0])
+	# we want one of the following compensators as they're approximately equivalent to 0.01*s
+	H1 = 10**-6*s**2/(10**-4*s+1)
+	H3 = 10**-5*s**2/(10**-3*s+1)
+	H5 = 10**-4*s**2/(10**-2*s+1)
+	# H1 gives the following performance, which is decently close to that for which we're searching
+	# {'p_m': 52.409815857697978, 'w_c': 772281.35713886423}
+	# dynamic tracking error = 2.99000976957e-05
+	for H_s1 in [H1, H3, H5]:
+		system = H_s2*G_s2*blacks(G_s1, H_s1)
+		print phaseMargin(system)
+		print 1/(1+eeval(system, 10**3)[0])
+
+if __name__ == "PS7P2":
+	K1 = 1
+	K2 = 1
+	G2 = 100/((0.1*s+1)*(0.01*s+1)**2)
+	G1 = K1
+	H2 = K2*s
+	openLoop = 1/H2
+	# K2 = 0.01
+	K2 = eeval(openLoop, 100)[0] 
+	H2 = K2*s
+	system = G1 * blacks(G2, H2)
+	drawBode(system, color='r', labeled="minor loop")
+	# constants = {'alpha': 10, 'K_l': 0.06534278272933923, 'tau': 0.00311880323448373}
+	constants, G1l = leadCompensate(G2, 60)
+	system = G1l*G2
+	drawBode(system, color='b', labeled="lead compensator")
+	# part C - the lead compensator is considerably less robust to changes in the transfer function, going unstable with a one order of magnitude increase in DC gain
+	G2 = 1000/((0.1*s+1)*(0.01*s+1)**2)
+	#{'p_m': 88.874129057321781, 'w_c': 98.625217948687848}
+	print phaseMargin(G1 * blacks(G2, H2))
+	#{'p_m': 340.14784425371175, 'w_c': 354.07739089652699}
+	print phaseMargin(G1l*G2)
+	pyplot.figure()
+	G2 = 100/((0.1*s+1)*(0.01*s+1)**2)
+	pyplot.plot(*signal.step2(e2nd(blacks(blacks(G2, H2), 1)), T=numpy.linspace(0,0.3,ct)), color='r', label="minor loop")
+	pyplot.plot(*signal.step2(e2nd(blacks(G1l * G2, 1)), T=numpy.linspace(0,0.3,ct)), color='b', label="lead compensator")
+	pyplot.xlabel("time")
+	pyplot.ylabel("amplitude in response to step input")
+	pyplot.title("step response for minor & lead compensation")
+	pyplot.legend(loc="best")
+	pyplot.show()
 
 if __name__ == "pset6":
 	""" to find a compensator useful to stabilize the transfer functions given, 
