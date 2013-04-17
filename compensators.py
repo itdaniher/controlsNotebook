@@ -9,6 +9,7 @@ import scipy.signal as signal
 import pprint
 j = sympy.I
 from nichols import nichols_grid
+import control
 
 ct = 1000
 
@@ -34,8 +35,8 @@ def bode(expression, n = 10):
 	for freq in freqs:
 		(m, p) = eeval(expression, freq)
 		magnitude = numpy.append(magnitude, m)
-		#if p >= 0:
-		#	p = -360+p
+		if p >= 0:
+			p = -360+p
 		phase = numpy.append(phase, p)
 	magnitude = numpy.array(map(decibels, magnitude))
 	return freqs, magnitude, phase
@@ -157,7 +158,52 @@ def drawBode(expression, f1=pyplot.figure(), color="k", labeled=""):
 	#f2.savefig("./figure2.png", dpi = 300)
 	return f1#, f2
 
-__name__ = "PS7P2"
+def rLocus(expression, f1=pyplot.figure(), color="k", labeled=""):
+	r, k = control.matlab.rlocus(sys=control.TransferFunction(*e2nd(expression)), klist = numpy.linspace(0, 10, 10000))
+	pyplot.plot(k, r, color)
+	return f1
+
+
+__name__ = "PS8P3"
+
+
+if __name__ == "PS8P3":
+	G_c = (s+4)
+	H_s = 1
+	G_p = 200/(s*(s+3)*(s+20))
+	print gainMargin(G_p)
+	drawBode(blacks(G_c*G_p, H_s), color='r', labeled='forward Compensation')
+	H_s = s+4
+	G_c = 1	
+	drawBode(blacks(G_c*G_p, H_s), color='b', labeled='feedback compensation')
+	# gain margin at 62.87dB; system is stable for K values of 0 to 1392
+	pyplot.show()
+
+if __name__ == "PS8P2":
+	K = 1
+	N = 3
+	from sympy.abc import x
+	# N = 3; 0.001732
+	# N = 5; 0.000727
+	# N = 6; 0.000577
+	# trig to solve for location of poles required to shift the overal angle of approach where we want it
+	tau = float(sympy.solve(sympy.atan(1000/(1/x))-sympy.rad(180/N))[0])
+	G_p = (K/s)*(10**6/(s**2+20*s+10**6))
+	tau = 1/(180/N)
+	G_c = 1/(tau*s+1)**N
+	rLocus(G_c*G_p)
+	drawBode(G_c*G_p)
+	pyplot.show()
+
+if __name__ == "PS8P1":
+	L_a = 1/(s+1)**3
+	L_b = s/(s+1)**3
+	L_c = 1/(s*(s+1)**3)
+	L_d = 1/(s+1)**4 
+	L_e = s/(s+1)**4 
+	L_f = 1/(s*(s+1)**4)
+	rLocus(L_f, color="k")
+	pyplot.show()
 
 if __name__ == "PS7P1":
 	# G/1+GH -> 1/H
