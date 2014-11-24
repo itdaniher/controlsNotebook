@@ -1,4 +1,5 @@
-import scipy.signal as signal
+#import scipy.signal as signal
+from scipy import signal
 from pylab import *
 hold(True)
 
